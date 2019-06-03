@@ -1,5 +1,6 @@
 #!/bin/bash
 
+prog=K2M
 if [ $# -eq 0 ]; then
     echo
     echo "Generate kanga file via a spiglet compiler based on Java"
@@ -20,11 +21,11 @@ fi
 
 if [ $# -eq 1 ]; then
 
-    java S2K $1
+    java K2M $1
     exit
 fi
 
 if [ $# -eq 2 ]; then
-    java S2K $1 $2
+    java K2M $1 $2
     exit
 fi

@@ -18,4 +18,4 @@ if [ ! -f $1 ]; then
     exit
 fi
 
-java -jar ./kgi.jar < $1
+spim -file $1
