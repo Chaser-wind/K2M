@@ -6,7 +6,7 @@ import java.util.Vector;
 
 public class KangaParser implements KangaParserConstants {
 
-  static final public Goal Goal() throws ParseException {
+  final public Goal Goal() throws ParseException {
    NodeToken n0;
    Token n1;
    NodeToken n2;

@@ -2,10 +2,10 @@
 
 if [ $# -eq 0 ]; then
     echo
-    echo "Run kanga file via a kanga interpreter based on Java"
+    echo "Run mips file via a mips interpreter"
     echo 
     echo "usage:"
-    echo "      ./run.sh [kanga file]"
+    echo "      ./run.sh [mips file]"
     echo 
     exit
 fi

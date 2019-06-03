@@ -3,10 +3,10 @@
 prog=K2M
 if [ $# -eq 0 ]; then
     echo
-    echo "Generate kanga file via a spiglet compiler based on Java"
+    echo "Generate mips file via a kanga compiler based on Java"
     echo 
     echo "usage:"
-    echo "      ./gen.sh {spiglet file} [outputfile]"
+    echo "      ./gen.sh {kanga file} [mips file]"
     echo
     exit
 fi
