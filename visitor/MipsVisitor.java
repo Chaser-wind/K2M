@@ -3,7 +3,7 @@ import syntaxtree.*;
 import java.util.*;
 
 
-
+// Concat, CallStack, PASSARG
 public class MipsVisitor extends GJNoArguDepthFirst<String> {
 
 	public String alloc = "";
@@ -230,13 +230,11 @@ public class MipsVisitor extends GJNoArguDepthFirst<String> {
 	* f2 -> IntegerLiteral()
 	* f3 -> Reg()
 	*/
-	public R visit(HStoreStmt n) {
-		R _ret=null;
-		n.f0.accept(this);
-		n.f1.accept(this);
-		n.f2.accept(this);
-		n.f3.accept(this);
-		return _ret;
+	public String visit(HStoreStmt n) {
+		String base = n.f1.accept(this);
+		String offset = n.f2.accept(this);
+		String reg2 = n.f3.accept(this);
+		return "sw " + reg2 + ", " + offset + "(" + base + ")";
 	}
 	
 	/**
@@ -245,13 +243,11 @@ public class MipsVisitor extends GJNoArguDepthFirst<String> {
 	* f2 -> Reg()
 	* f3 -> IntegerLiteral()
 	*/
-	public R visit(HLoadStmt n) {
-		R _ret=null;
-		n.f0.accept(this);
-		n.f1.accept(this);
-		n.f2.accept(this);
-		n.f3.accept(this);
-		return _ret;
+	public String visit(HLoadStmt n) {
+		String reg1 = n.f1.accept(this);
+		String base = n.f2.accept(this);
+		String offset = n.f3.accept(this);
+		return "lw " + reg1 + " " + offset + "(" + base + ")";
 	}
 	
 	/**
@@ -262,10 +258,18 @@ public class MipsVisitor extends GJNoArguDepthFirst<String> {
 	public String visit(MoveStmt n) {
 		int c = n.f2.f0.which;
 		if (c == 1) {	// Exp -> Binop
-			String []buf = n.f2.accept(this).split(" ");
+			String []buf = n.f2.accept(this).split("!");
 			return buf[0] + " " + n.f1.accept(this) + buf[1];
-		} else {
-			return "" // !!!
+		} else if (c == 0) {	// Exp -> Halloc
+			String ret = n.f2.accept(this);
+			return ret + "\n" + "move " + n.f1.accept(this) + " $v0";	
+		} else {	// SimpleExp
+			char[] simp = n.f2.accept(this).toCharArray();
+			if (simp[0] >= '0' && simp[0] <= '9') {		// IntergerLiteral
+				return "li " + n.f1.accept(this) + " " + n.f2.accept(this);
+			} else {
+				return "move " + n.f1.accept(this) + " " + n.f2.accept(this);
+			}
 		}
 	}
 	
@@ -273,11 +277,11 @@ public class MipsVisitor extends GJNoArguDepthFirst<String> {
 	 * f0 -> "PRINT"
 	* f1 -> SimpleExp()
 	*/
-	public R visit(PrintStmt n) {
-		R _ret=null;
-		n.f0.accept(this);
-		n.f1.accept(this);
-		return _ret;
+	public String visit(PrintStmt n) {
+		String ret = "";
+		ret += "move $a0 " + n.f1.accept(this) + "\n";
+		ret += "jal _print";
+		return ret;
 	}
 	
 	/**
@@ -285,12 +289,10 @@ public class MipsVisitor extends GJNoArguDepthFirst<String> {
 	* f1 -> Reg()
 	* f2 -> SpilledArg()
 	*/
-	public R visit(ALoadStmt n) {
-		R _ret=null;
-		n.f0.accept(this);
-		n.f1.accept(this);
-		n.f2.accept(this);
-		return _ret;
+	public String visit(ALoadStmt n) {
+		String reg = n.f1.accept(this);
+		String spilledarg = n.f2.accept(this);
+		return "lw " + reg + ", " + spilledarg + "($sp)";
 	}
 	
 	/**
@@ -298,12 +300,10 @@ public class MipsVisitor extends GJNoArguDepthFirst<String> {
 	* f1 -> SpilledArg()
 	* f2 -> Reg()
 	*/
-	public R visit(AStoreStmt n) {
-		R _ret=null;
-		n.f0.accept(this);
-		n.f1.accept(this);
-		n.f2.accept(this);
-		return _ret;
+	public String visit(AStoreStmt n) {
+		String spilledarg = n.f1.accept(this);
+		String reg = n.f2.accept(this);
+		return "sw " + reg + ", " + spilledarg + "($sp)";
 	}
 	
 	/**
@@ -323,11 +323,8 @@ public class MipsVisitor extends GJNoArguDepthFirst<String> {
 	 * f0 -> "CALL"
 	* f1 -> SimpleExp()
 	*/
-	public R visit(CallStmt n) {
-		R _ret=null;
-		n.f0.accept(this);
-		n.f1.accept(this);
-		return _ret;
+	public String visit(CallStmt n) {
+		return "jalr " + n.f1.accept(this);
 	}
 	
 	/**
@@ -335,21 +332,19 @@ public class MipsVisitor extends GJNoArguDepthFirst<String> {
 	*       | BinOp()
 	*       | SimpleExp()
 	*/
-	public R visit(Exp n) {
-		R _ret=null;
-		n.f0.accept(this);
-		return _ret;
+	public String visit(Exp n) {
+		return n.f0.accept(this);
 	}
 	
 	/**
 	 * f0 -> "HALLOCATE"
 	* f1 -> SimpleExp()
 	*/
-	public R visit(HAllocate n) {
-		R _ret=null;
-		n.f0.accept(this);
-		n.f1.accept(this);
-		return _ret;
+	public String visit(HAllocate n) {
+		String ret = "";
+		ret += "li $a0 " + n.f1.accept(this) + "\n";
+		ret += "jal _halloc";
+		return ret;
 	}
 	
 	/**
@@ -359,7 +354,7 @@ public class MipsVisitor extends GJNoArguDepthFirst<String> {
 	*/
 	// "slt (),$s1,$t0"
 	public String visit(BinOp n) {
-		return n.f0.accept(this) + " ," + n.f1.accept(this) + n.f2.accept(this);
+		return n.f0.accept(this) + "!, " + n.f1.accept(this) + ", " + n.f2.accept(this);
 	}
 	
 	/**
@@ -378,11 +373,8 @@ public class MipsVisitor extends GJNoArguDepthFirst<String> {
 	 * f0 -> "SPILLEDARG"
 	* f1 -> IntegerLiteral()
 	*/
-	public R visit(SpilledArg n) {
-		R _ret=null;
-		n.f0.accept(this);
-		n.f1.accept(this);
-		return _ret;
+	public String visit(SpilledArg n) {
+		return n.f1.f0.tokenImage;
 	}
 	
 	/**
