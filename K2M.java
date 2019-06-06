@@ -15,7 +15,8 @@ public class K2M {
             InputStream in = new FileInputStream(args[0]);
             Node root = new KangaParser(in).Goal();
 
-            String code = "";
+            MipsVisitor v = new MipsVisitor();
+            String code = root.accept(v);
             
             String outputfile = null;
             if (args.length > 1) {
