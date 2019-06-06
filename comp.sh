@@ -10,8 +10,8 @@ make
 
 for file in ${flist[@]}
 do
-    ./run.sh ./src/$file.kg > $tmp1
-    ./run.sh ./right/$file.kg > $tmp2
+    ./run.sh ./src/$file.s > $tmp1
+    ./run.sh ./right/$file.s > $tmp2
     diff $tmp1 $tmp2
 done
 

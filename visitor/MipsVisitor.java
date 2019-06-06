@@ -7,8 +7,7 @@ import java.util.*;
 public class MipsVisitor extends GJNoArguDepthFirst<String> {
 
 	public String alloc = "";
-	
-
+	Integer argnum, stacknum, totalnum;
 	/*
 	 * 	.text
 		.globl _halloc
@@ -33,9 +32,9 @@ public class MipsVisitor extends GJNoArguDepthFirst<String> {
 	str_er: .asciiz " ERROR: abnormal termination\n" 
 	 */
 	void genalloc() {
-		alloc += "\t.text\n\t.globl_halloc\n";
+		alloc += "\t.text\n\t.globl _halloc\n";
 		alloc += "_halloc:\n\tli $v0, 9\n\tsyscall\n\tj $ra\n\n";
-		alloc += "\t.text\n\t.globl_print\n";
+		alloc += "\t.text\n\t.globl _print\n";
 		alloc += "_print:\n\tli $v0, 1\n\tsyscall\n\tla $a0, newl\n\tli $v0, 4\n\tsyscall\n\tj $ra\n\n";
 		alloc += "\t.data\n\t.align 0\n";
 		alloc += "newl:\n\t.asciiz \"\\n\"\n\t.data\n\t.align 0\n";
@@ -66,7 +65,7 @@ public class MipsVisitor extends GJNoArguDepthFirst<String> {
 			String tmp = e.nextElement().accept(this);
 			if (k == 0) {		// (Label)?
 				if (!tmp.equals(""))
-					ret += tmp + ":\n";
+					ret += tmp + ": nop\n";
 			} else {		// Stmt
 				ret += "\t" + tmp;
 			}
@@ -110,16 +109,25 @@ public class MipsVisitor extends GJNoArguDepthFirst<String> {
 	* f13 -> <EOF>
 	*/
 	public String visit(Goal n) {
+		argnum = Integer.parseInt(n.f2.accept(this));
+		argnum = argnum > 4 ? argnum - 4 : 0;
+		stacknum = Integer.parseInt(n.f5.accept(this));
+		totalnum = Integer.parseInt(n.f8.accept(this));
+		totalnum = totalnum > 4 ? totalnum - 4 : 0;
+		Integer stack = stacknum - argnum + totalnum + 2;
 		String ret = "";
 		ret += "\t.text\n";
 		ret += "\t.globl main\n";
 		ret += "main:\n";
+		ret += "\tsw $fp, -8($sp)\n";
+		ret += "\tsw $ra, -4($sp)\n";
 		ret += "\tmove $fp, $sp\n";
-		ret += "\tsubu $sp, $sp, 4\n";
-		ret += "\tsw $ra, -4($fp)\n";
+		ret += "\tsubu $sp, $sp, " + (stack * 4) + "\n";
+		//ret += "\tsw $ra, -4($fp)\n";
 		ret += n.f10.accept(this);
 		ret += "\tlw $ra, -4($fp)\n";
-		ret += "\taddu $sp, $sp, 4\n";
+		ret += "\tlw $fp, -8($fp)\n";
+		ret += "\taddu $sp, $sp, " + (stack * 4) + "\n";
 		ret += "\tj $ra\n";
 		ret += n.f12.accept(this);
 
@@ -151,24 +159,26 @@ public class MipsVisitor extends GJNoArguDepthFirst<String> {
 	*/
 	public String visit(Procedure n) {
 		String ret = "";
-		ret += "\t.text\n";
 		String procname = n.f0.accept(this);
+		ret += "\t.text\n\t.globl " + procname + "\n";
 		ret += procname + ":\n";
-		// String argnum = n.f2.accept(this);
-		String stacknum = n.f5.accept(this);
-		// String totalnum = n.f8.accept(this);
-		
+		argnum = Integer.parseInt(n.f2.accept(this));
+		argnum = argnum > 4 ? argnum - 4 : 0;
+		stacknum = Integer.parseInt(n.f5.accept(this));
+		totalnum = Integer.parseInt(n.f8.accept(this));
+		totalnum = totalnum > 4 ? totalnum - 4 : 0;
+		Integer stack = stacknum - argnum + totalnum + 2;
 		// build call frame
 		ret += "\tsw $fp, -8($sp)\n";
 		ret += "\tmove $fp, $sp\n";
-		ret += String.format("\tsubu $sp, $sp, %d\n", (Integer.parseInt(stacknum) + 2) * 4);
+		ret += String.format("\tsubu $sp, $sp, %d\n", stack * 4);
 		ret += "\tsw $ra, -4($fp)\n";
 		
-		ret += n.f10.accept(this) + "\n";
+		ret += n.f10.accept(this);
 
 		ret += "\tlw $ra, -4($fp)\n";
-		ret += String.format("\tlw $fp, %d($sp)\n", Integer.parseInt(stacknum) * 4);
-		ret += String.format("\taddu $sp, $sp, %d\n", (Integer.parseInt(stacknum) + 2) * 4);
+		ret += String.format("\tlw $fp, -8($fp)\n");
+		ret += String.format("\taddu $sp, $sp, %d\n", stack * 4);
 		ret += "\tj $ra\n";
 		return ret;
 	}
@@ -268,7 +278,10 @@ public class MipsVisitor extends GJNoArguDepthFirst<String> {
 			if (simp[0] >= '0' && simp[0] <= '9') {		// IntergerLiteral
 				return "li " + n.f1.accept(this) + " " + n.f2.accept(this);
 			} else {
-				return "move " + n.f1.accept(this) + " " + n.f2.accept(this);
+				if (simp[0] == '$') {
+					return "move " + n.f1.accept(this) + " " + n.f2.accept(this);
+				}
+				return "la " + n.f1.accept(this) + " " + n.f2.accept(this);
 			}
 		}
 	}
@@ -285,6 +298,15 @@ public class MipsVisitor extends GJNoArguDepthFirst<String> {
 	}
 	
 	/**
+	 * f0 -> "ERROR"
+	*/
+	public String visit(ErrorStmt n) {
+		String ret = "";
+		ret += "la $a0 str_er\n";
+		ret += "\tjal _print";
+		return ret;
+	}
+	/**
 	 * f0 -> "ALOAD"
 	* f1 -> Reg()
 	* f2 -> SpilledArg()
@@ -292,7 +314,7 @@ public class MipsVisitor extends GJNoArguDepthFirst<String> {
 	public String visit(ALoadStmt n) {
 		String reg = n.f1.accept(this);
 		String spilledarg = n.f2.accept(this);
-		return String.format("lw %s, %d($sp)", reg, Integer.parseInt(spilledarg) * 4);
+		return String.format("lw %s, %s", reg, spilledarg);
 	}
 	
 	/**
@@ -303,7 +325,7 @@ public class MipsVisitor extends GJNoArguDepthFirst<String> {
 	public String visit(AStoreStmt n) {
 		String spilledarg = n.f1.accept(this);
 		String reg = n.f2.accept(this);
-		return String.format("sw %s, %d($sp)", reg, Integer.parseInt(spilledarg) * 4);
+		return String.format("sw %s, %s", reg, spilledarg);
 	}
 	
 	/**
@@ -341,7 +363,14 @@ public class MipsVisitor extends GJNoArguDepthFirst<String> {
 	*/
 	public String visit(HAllocate n) {
 		String ret = "";
-		ret += "li $a0 " + n.f1.accept(this) + "\n";
+		String simp = n.f1.accept(this);
+		if (simp.charAt(0) == '$')
+			ret += "move $a0 " + n.f1.accept(this) + "\n";
+		else if (simp.charAt(0) >= '0' && simp.charAt(0) <= '9') {
+			ret += "li $a0 " + n.f1.accept(this) + "\n";
+		} else {
+			ret += "la $a0 " + n.f1.accept(this) + "\n";
+		}
 		ret += "\tjal _halloc";
 		return ret;
 	}
@@ -373,7 +402,12 @@ public class MipsVisitor extends GJNoArguDepthFirst<String> {
 	* f1 -> IntegerLiteral()
 	*/
 	public String visit(SpilledArg n) {
-		return n.f1.f0.tokenImage;
+		Integer id = Integer.parseInt(n.f1.f0.tokenImage);
+		//System.out.println(String.format("%d %d", id, argnum));
+		if (id >= argnum) {
+			id = argnum - id - 3;
+		} 
+		return 4 * id + "($fp)";
 	}
 	
 	/**
